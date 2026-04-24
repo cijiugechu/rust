@@ -65,6 +65,11 @@ pub(crate) struct FnCtxt<'a, 'tcx> {
     /// First span of a return site that we find. Used in error messages.
     pub(super) ret_coercion_span: Cell<Option<Span>>,
 
+    /// Whether the return type of the current body was already fixed by an
+    /// explicit annotation or a concrete outer expectation, as opposed to being
+    /// inferred from returns within the body itself.
+    pub(super) return_type_pre_known: bool,
+
     pub(super) coroutine_types: Option<CoroutineTypes<'tcx>>,
 
     /// Whether the last checked node generates a divergence (e.g.,
@@ -144,6 +149,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             param_env,
             ret_coercion: None,
             ret_coercion_span: Cell::new(None),
+            return_type_pre_known: true,
             coroutine_types: None,
             diverges: Cell::new(Diverges::Maybe),
             function_diverges_because_of_empty_arguments: Cell::new(Diverges::Maybe),

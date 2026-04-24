@@ -19,3 +19,14 @@ fn main() {
 // issue: rust-lang/rust#130858 rust-lang/rust#125655
 static FOO: fn() -> bool = || -> bool { 1 };
 //~^ ERROR mismatched types
+
+// issue: rust-lang/rust#155658
+struct SmolStr;
+const _: fn() = || {
+    match Some(()) {
+        Some(()) => (),
+        None => return,
+    };
+    let _: String = { SmolStr };
+    //~^ ERROR mismatched types
+};

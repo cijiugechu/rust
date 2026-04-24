@@ -31,6 +31,7 @@ pub(super) fn check_fn<'a, 'tcx>(
     fn_def_id: LocalDefId,
     body: &'tcx hir::Body<'tcx>,
     params_can_be_unsized: bool,
+    return_type_pre_known: bool,
 ) -> Option<CoroutineTypes<'tcx>> {
     let fn_id = fcx.tcx.local_def_id_to_hir_id(fn_def_id);
     let tcx = fcx.tcx;
@@ -45,6 +46,7 @@ pub(super) fn check_fn<'a, 'tcx>(
 
     fcx.coroutine_types = coroutine_types;
     fcx.ret_coercion = Some(RefCell::new(CoerceMany::new(ret_ty)));
+    fcx.return_type_pre_known = return_type_pre_known;
 
     let span = body.value.span;
 

@@ -2007,8 +2007,7 @@ impl<'tcx> CoerceMany<'tcx> {
             // may occur at the first return expression we see in the closure
             // (if it conflicts with the declared return type). Skip adding a
             // note in this case, since it would be incorrect.
-            && let Some(fn_sig) = fcx.body_fn_sig()
-            && fn_sig.output().is_ty_var()
+            && !fcx.return_type_pre_known
         {
             err.span_note(sp, format!("return type inferred to be `{expected}` here"));
         }

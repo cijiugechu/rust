@@ -175,7 +175,17 @@ fn typeck_with_inspect<'tcx>(
             naked_functions::typeck_naked_fn(tcx, def_id, body);
         }
 
-        check_fn(&mut fcx, fn_sig, None, decl, def_id, body, tcx.features().unsized_fn_params());
+        let return_type_pre_known = !fn_sig.output().is_ty_var();
+        check_fn(
+            &mut fcx,
+            fn_sig,
+            None,
+            decl,
+            def_id,
+            body,
+            tcx.features().unsized_fn_params(),
+            return_type_pre_known,
+        );
     } else {
         let expected_type = if let Some(infer_ty) = infer_type_if_missing(&fcx, node) {
             infer_ty

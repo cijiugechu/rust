@@ -66,7 +66,10 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             None => (None, None),
         };
 
-        let ClosureSignatures { bound_sig, mut liberated_sig } =
+        let (
+            ClosureSignatures { bound_sig, mut liberated_sig },
+            return_type_pre_known,
+        ) =
             self.sig_of_closure(expr_def_id, closure.fn_decl, closure.kind, expected_sig);
 
         debug!(?bound_sig, ?liberated_sig);
@@ -281,6 +284,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             body,
             // Closure "rust-call" ABI doesn't support unsized params
             false,
+            return_type_pre_known,
         );
 
         closure_ty
@@ -626,7 +630,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         decl: &hir::FnDecl<'tcx>,
         closure_kind: hir::ClosureKind,
         expected_sig: Option<ExpectedSig<'tcx>>,
-    ) -> ClosureSignatures<'tcx> {
+    ) -> (ClosureSignatures<'tcx>, bool) {
         if let Some(e) = expected_sig {
             self.sig_of_closure_with_expectation(expr_def_id, decl, closure_kind, e)
         } else {
@@ -642,10 +646,11 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         expr_def_id: LocalDefId,
         decl: &hir::FnDecl<'tcx>,
         closure_kind: hir::ClosureKind,
-    ) -> ClosureSignatures<'tcx> {
+    ) -> (ClosureSignatures<'tcx>, bool) {
         let bound_sig = self.supplied_sig_of_closure(expr_def_id, decl, closure_kind);
-
-        self.closure_sigs(expr_def_id, bound_sig)
+        let closure_sigs = self.closure_sigs(expr_def_id, bound_sig);
+        let return_type_pre_known = !closure_sigs.liberated_sig.output().is_ty_var();
+        (closure_sigs, return_type_pre_known)
     }
 
     /// Invoked to compute the signature of a closure expression. This
@@ -702,7 +707,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         decl: &hir::FnDecl<'tcx>,
         closure_kind: hir::ClosureKind,
         expected_sig: ExpectedSig<'tcx>,
-    ) -> ClosureSignatures<'tcx> {
+    ) -> (ClosureSignatures<'tcx>, bool) {
         // Watch out for some surprises and just ignore the
         // expectation if things don't see to match up with what we
         // expect.
@@ -734,6 +739,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         let bound_sig = self.tcx.anonymize_bound_vars(bound_sig);
 
         let closure_sigs = self.closure_sigs(expr_def_id, bound_sig);
+        let expected_output_pre_known = !closure_sigs.liberated_sig.output().is_ty_var();
 
         // Up till this point, we have ignored the annotations that the user
         // gave. This function will check that they unify successfully.
@@ -746,7 +752,14 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             closure_kind,
             closure_sigs,
         ) {
-            Ok(infer_ok) => self.register_infer_ok_obligations(infer_ok),
+            Ok(infer_ok) => {
+                let closure_sigs = self.register_infer_ok_obligations(infer_ok);
+                let return_type_pre_known = match decl.output {
+                    hir::FnRetTy::Return(_) => true,
+                    hir::FnRetTy::DefaultReturn(_) => expected_output_pre_known,
+                };
+                (closure_sigs, return_type_pre_known)
+            }
             Err(_) => self.sig_of_closure_no_expectation(expr_def_id, decl, closure_kind),
         }
     }
@@ -756,7 +769,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
         expr_def_id: LocalDefId,
         decl: &hir::FnDecl<'tcx>,
         expected_sig: ExpectedSig<'tcx>,
-    ) -> ClosureSignatures<'tcx> {
+    ) -> (ClosureSignatures<'tcx>, bool) {
         let expr_map_node = self.tcx.hir_node_by_def_id(expr_def_id);
         let expected_args: Vec<_> = expected_sig
             .sig
@@ -786,7 +799,9 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
 
         let error_sig = self.error_sig_of_closure(decl, guar);
 
-        self.closure_sigs(expr_def_id, error_sig)
+        let closure_sigs = self.closure_sigs(expr_def_id, error_sig);
+        let return_type_pre_known = !closure_sigs.liberated_sig.output().is_ty_var();
+        (closure_sigs, return_type_pre_known)
     }
 
     /// Enforce the user's types against the expectation. See
