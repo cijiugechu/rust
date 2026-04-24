@@ -66,10 +66,7 @@ impl<'a, 'tcx> FnCtxt<'a, 'tcx> {
             None => (None, None),
         };
 
-        let (
-            ClosureSignatures { bound_sig, mut liberated_sig },
-            return_type_pre_known,
-        ) =
+        let (ClosureSignatures { bound_sig, mut liberated_sig }, return_type_pre_known) =
             self.sig_of_closure(expr_def_id, closure.fn_decl, closure.kind, expected_sig);
 
         debug!(?bound_sig, ?liberated_sig);
